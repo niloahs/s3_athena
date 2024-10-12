@@ -224,6 +224,21 @@ def verify_file_upload(bucket_name, file_name):
             print(f"Error verifying file '{file_name}': {e}")
             raise
 
+def list_object_versions(bucket_name, object_name):
+    """Lists all versions of a specific object in the S3 bucket."""
+    try:
+        response = s3_client.list_object_versions(
+            Bucket=bucket_name,
+            Prefix=object_name
+        )
+        versions = response.get('Versions', [])
+        print(f"Versions of '{object_name}':")
+        for version in versions:
+            print(f"  Version ID: {version['VersionId']}, Last Modified: {version['LastModified']}")
+    except ClientError as e:
+        print(f"Error listing versions of '{object_name}': {e}")
+        raise
+
 def main():
     """Main function to orchestrate S3 operations."""
     try:

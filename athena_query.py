@@ -1,12 +1,36 @@
 import time
 import boto3
+import os
 from botocore.exceptions import ClientError
 
 # Initialize Boto3 Athena Client
 athena_client = boto3.client('athena', region_name='us-east-1')
 
+ATHENA_DATABASE = os.environ.get('ATHENA_DATABASE', 'default_database')
+athena_output_bucket = os.environ.get('ATHENA_OUTPUT_BUCKET', 'default-output-bucket')
+
 # Initialize Boto3 S3 Client
 s3 = boto3.client('s3')
+
+def run_s3_select_query(bucket_name, object_key, query):
+    """Runs an S3 SELECT query using Athena."""
+    athena_query = f"""
+    SELECT *
+    FROM s3object s
+    WHERE {query}
+    """
+    
+    full_query = f"""
+    SELECT *
+    FROM TABLE(
+        SPECTRUM.QUERY_S3OBJECT(
+            's3://{bucket_name}/{object_key}',
+            '{athena_query}'
+        )
+    )
+    """
+    
+    return run_athena_query(full_query, ATHENA_DATABASE, athena_output_bucket)
 
 def create_athena_database(database_name, athena_output_bucket):
     """Creates a new database in Athena."""
