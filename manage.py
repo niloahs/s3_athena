@@ -1,0 +1,255 @@
+import uuid
+
+import boto3
+import click
+from botocore.exceptions import ClientError
+
+from athena_module import *
+from s3_module import *
+from utils.helpers import load_config, save_config
+
+# Configuration Constants
+ATHENA_DATABASE = 'medical_data'
+ATHENA_TABLE = 'patient_data'
+
+
+# Generate unique bucket names
+def generate_bucket_names():
+    images_bucket = f'medical-images-{uuid.uuid4()}'
+    data_bucket = f'patient-data-{uuid.uuid4()}'
+    return images_bucket, data_bucket
+
+
+@click.group()
+def cli():
+    """Medical Image Storage CLI"""
+    pass
+
+
+@cli.group()
+def s3():
+    """Commands related to S3 operations"""
+    pass
+
+
+@cli.group()
+def athena():
+    """Commands related to Athena operations"""
+    pass
+
+
+@cli.command()
+@click.option('--region', default=REGION_NAME, help='AWS region')
+def setup(region):
+    """Set up S3 buckets and Athena"""
+    click.echo("Setting up S3 buckets and Athena...")
+    images_bucket, data_bucket = generate_bucket_names()
+
+    create_bucket(images_bucket, region)
+    create_bucket(data_bucket, region)
+
+    enable_versioning(data_bucket)
+
+    set_lifecycle_policy(images_bucket)
+    set_lifecycle_policy(data_bucket)
+
+    set_bucket_policy(data_bucket)
+
+    enable_encryption(images_bucket, region)
+    enable_encryption(data_bucket, region)
+
+    athena_output_bucket = f'athena-query-results-{uuid.uuid4()}'
+    create_bucket(athena_output_bucket, region)
+
+    config_data = {
+        "images_bucket": images_bucket,
+        "data_bucket": data_bucket,
+        "athena_output_bucket": athena_output_bucket
+    }
+    save_config(config_data)
+
+    click.echo("Setup complete. Bucket names saved to 'config.json'.")
+
+
+@s3.command('delete-bucket')
+@click.argument('bucket_names', nargs=-1, type=click.STRING, required=True)
+def delete_bucket_command(bucket_names):
+    """Delete one or more S3 buckets"""
+    results = delete_multiple_buckets(bucket_names)
+    for result in results:
+        click.echo(result)
+        if "has been deleted" in result:
+            bucket_name = result.split("'")[1]  # Extract bucket name from the success message
+            config_update = update_config_after_deletion(bucket_name)
+            if config_update:
+                click.echo(config_update)
+
+
+@s3.command('list-buckets')
+@click.option('--nodate', is_flag=True, help='List buckets without creation dates')
+@click.option('--collection', is_flag=True, help='Output bucket names as a space-separated list')
+def s3_list_buckets(nodate, collection):
+    """List all S3 buckets in the AWS account"""
+    result = list_buckets(nodate, collection)
+    click.echo(result)
+
+
+@s3.command('list-contents')
+@click.argument('bucket_name')
+def list_contents(bucket_name):
+    """List contents of the specified bucket"""
+    list_bucket_contents(bucket_name)
+
+
+@s3.command('upload')
+@click.argument('filename')
+def upload(filename):
+    """Upload a file to the data bucket"""
+    config_data = load_config()
+    upload_file(f'data/{filename}', config_data['data_bucket'])
+
+
+@s3.command('delete-file')
+@click.argument('filename')
+def delete_file(filename):
+    """Delete a file from the data bucket (creates a delete marker)"""
+    config_data = load_config()
+    s3_client = boto3.client('s3')
+    try:
+        s3_client.delete_object(Bucket=config_data['data_bucket'], Key=filename)
+        click.echo(f"Created delete marker for {filename} in {config_data['data_bucket']}")
+    except ClientError as e:
+        click.echo(f"Error creating delete marker for {filename}: {e}")
+
+
+@s3.command('restore-version')
+@click.argument('filename')
+@click.argument('version_id')
+def restore_version(filename, version_id):
+    """Restore a specific version of a file"""
+    config_data = load_config()
+    s3_client = boto3.client('s3')
+    bucket_name = config_data['data_bucket']
+    try:
+        # List object versions to check if the specified version exists
+        versions = s3_client.list_object_versions(Bucket=bucket_name, Prefix=filename)
+
+        # Check if the specified version exists
+        version_exists = any(v['VersionId'] == version_id for v in versions.get('Versions', []))
+        if not version_exists:
+            click.echo(f"Version {version_id} of {filename} does not exist.")
+            return
+
+        # Check if there's a delete marker
+        delete_marker = next((m for m in versions.get('DeleteMarkers', []) if m['IsLatest']), None)
+        if delete_marker:
+            # If there's a delete marker, remove it
+            s3_client.delete_object(Bucket=bucket_name, Key=filename,
+                                    VersionId=delete_marker['VersionId'])
+            click.echo(f"Removed delete marker for {filename}")
+
+        # Copy the specified version to make it the latest
+        copy_source = {'Bucket': bucket_name, 'Key': filename, 'VersionId': version_id}
+        s3_client.copy_object(Bucket=bucket_name, CopySource=copy_source, Key=filename)
+        click.echo(f"Restored version {version_id} of {filename}")
+    except ClientError as e:
+        click.echo(f"Error restoring version {version_id} of {filename}: {str(e)}")
+
+
+@s3.command('list-versions')
+@click.argument('filename')
+def list_versions(filename):
+    """List all versions of a specific file"""
+    config_data = load_config()
+    s3_client = boto3.client('s3')
+    bucket_name = config_data['data_bucket']
+    try:
+        versions = s3_client.list_object_versions(Bucket=bucket_name, Prefix=filename)
+        click.echo(f"Versions of {filename}:")
+        for version in versions.get('Versions', []):
+            click.echo(
+                f"Version ID: {version['VersionId']}, Last Modified: {version['LastModified']}")
+        for marker in versions.get('DeleteMarkers', []):
+            click.echo(
+                f"Delete Marker: {marker['VersionId']}, Last Modified: {marker['LastModified']}")
+    except ClientError as e:
+        click.echo(f"Error listing versions of {filename}: {e}")
+
+
+@s3.command('set-storage-class')
+@click.argument('filename')
+@click.option('--storage_class', type=click.Choice(
+    ['STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING', 'GLACIER', 'DEEP_ARCHIVE']),
+              required=True, help='Storage class to set')
+def set_storage_class(filename, storage_class):
+    """Set the storage class for a specific file"""
+    config_data = load_config()
+    s3_client = boto3.client('s3')
+    bucket_name = config_data['data_bucket']
+    try:
+        s3_client.copy_object(
+            Bucket=bucket_name,
+            CopySource={'Bucket': bucket_name, 'Key': filename},
+            Key=filename,
+            StorageClass=storage_class
+        )
+        click.echo(f"Set storage class of {filename} to {storage_class}")
+    except ClientError as e:
+        click.echo(f"Error setting storage class for {filename}: {str(e)}")
+
+
+@s3.command('generate-presigned-url')
+@click.argument('filename')
+@click.option('--expiration', default=3600, help='Expiration time in seconds')
+@click.option('--bucket', help='Bucket name')
+def generate_presigned_url(filename, expiration, bucket):
+    """Generate a presigned URL for a file"""
+    config_data = load_config()
+    s3_client = boto3.client('s3')
+
+    # Use the provided bucket name if given, otherwise use the default from config
+    bucket_name = bucket or config_data['data_bucket']
+
+    try:
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket_name, 'Key': filename},
+            ExpiresIn=expiration
+        )
+        click.echo(
+            f"Presigned URL for {filename} in bucket {bucket_name} (expires in {expiration} seconds):\n{url}")
+    except ClientError as e:
+        click.echo(f"Error generating presigned URL: {str(e)}")
+
+
+@athena.command('performance-test')
+@click.argument('query')
+@click.option('--iterations', default=5, help='Number of iterations for performance testing')
+def athena_performance_test(query, iterations):
+    """Run performance tests on Athena SELECT queries"""
+    config_data = load_config()
+    results = performance_test_select_query(query, ATHENA_DATABASE,
+                                            config_data['athena_output_bucket'], iterations)
+
+    click.echo(f"Query: {query}")
+    click.echo(f"Average execution time: {results['average_execution_time']:.2f} seconds")
+    click.echo(f"Average data scanned: {results['average_scanned_bytes'] / 1024:.2f} KB")
+
+    click.echo("\nIteration details:")
+    for i, result in enumerate(results['iteration_results'], 1):
+        click.echo(f"  Iteration {i}:")
+        click.echo(f"    Execution time: {result['execution_time']:.2f} seconds")
+        click.echo(f"    Data scanned: {result['scanned_bytes'] / 1024:.2f} KB")
+
+
+@athena.command('run-query')
+@click.argument('query')
+def run_query(query):
+    """Run an Athena query"""
+    config_data = load_config()
+    run_athena_query(query, ATHENA_DATABASE, config_data['athena_output_bucket'])
+    click.echo(f"Athena query executed.")
+
+
+if __name__ == '__main__':
+    cli()

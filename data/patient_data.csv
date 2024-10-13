@@ -1,0 +1,51 @@
+patient_id,name,age,gender,condition,admission_date,doctor,blood_type,weight_kg,height_cm
+001,Mike Johnson,42,M,Hypertension,2023-01-15,Dr. Smith,A+,85,178
+002,Emily Chen,35,F,Anxiety Disorder,2023-02-03,Dr. Patel,O-,62,165
+003,Robert Garcia,68,M,Coronary Artery Disease,2023-01-20,Dr. Lee,B+,92,182
+004,Amanda Taylor,29,F,Chronic Migraines,2023-02-10,Dr. Brown,AB-,58,160
+005,Chris Wilson,45,M,Type 2 Diabetes,2023-03-05,Dr. Jones,A-,76,183
+006,Jessica Martinez,22,F,Asthma,2023-02-18,Dr. Williams,O+,59,168
+007,Thomas Anderson,51,M,Lung Cancer,2023-03-12,Dr. Davis,B-,75,175
+008,Rachel Murphy,31,F,Carpal Tunnel Syndrome,2023-01-30,Dr. Miller,A+,60,165
+009,Daniel Kim,48,M,Arthritis,2023-02-22,Dr. Wilson,O+,82,180
+010,Laura Thompson,33,F,Fibromyalgia,2023-03-08,Dr. Moore,AB+,65,172
+011,Kevin Lewis,25,M,Depression,2023-01-25,Dr. Taylor,B+,70,175
+012,Sophia Nguyen,28,F,Hypothyroidism,2023-02-14,Dr. Anderson,O-,55,162
+013,Brian Clark,40,M,Lower Back Pain,2023-03-01,Dr. Thomas,A-,88,188
+014,Olivia Wright,35,F,Endometriosis,2023-02-28,Dr. Jackson,B-,68,170
+015,Steven Brown,39,M,High Cholesterol,2023-01-18,Dr. White,O+,75,183
+016,Emma Davis,32,F,Polycystic Ovary Syndrome,2023-03-15,Dr. Harris,A+,63,168
+017,Jason Lee,18,M,Acne,2023-02-05,Dr. Martin,AB+,68,175
+018,Michelle Robinson,36,F,Gestational Diabetes,2023-01-22,Dr. Thompson,O-,61,170
+019,Eric Baker,33,M,Gastroesophageal Reflux Disease,2023-03-10,Dr. Garcia,B+,77,180
+020,Samantha Hill,30,F,Irritable Bowel Syndrome,2023-02-20,Dr. Martinez,A-,59,163
+021,David Foster,55,M,Prostate Cancer,2023-01-28,Dr. Robinson,O+,88,185
+022,Karen White,47,F,Breast Cancer,2023-03-03,Dr. Clark,B-,70,168
+023,Mark Evans,62,M,Parkinson's Disease,2023-02-12,Dr. Rodriguez,AB+,79,176
+024,Linda Morris,58,F,Osteoporosis,2023-01-17,Dr. Lewis,A+,65,160
+025,Paul Hughes,43,M,Sleep Apnea,2023-03-07,Dr. Lee,O-,95,188
+026,Nancy Turner,50,F,Rheumatoid Arthritis,2023-02-25,Dr. Walker,B+,68,165
+027,George Patel,37,M,Crohn's Disease,2023-01-19,Dr. Hall,AB-,72,177
+028,Catherine Ross,41,F,Multiple Sclerosis,2023-03-14,Dr. Allen,O+,63,170
+029,Andrew Cooper,53,M,Chronic Kidney Disease,2023-02-08,Dr. Young,A-,84,182
+030,Melissa Green,26,F,Anemia,2023-01-31,Dr. King,B+,57,158
+031,Richard Carter,59,M,Glaucoma,2023-03-11,Dr. Wright,O-,78,175
+032,Jennifer Adams,38,F,Lupus,2023-02-16,Dr. Scott,AB+,66,172
+033,Timothy Nelson,44,M,Psoriasis,2023-01-23,Dr. Green,A+,81,180
+034,Rebecca Hall,52,F,Menopause,2023-03-02,Dr. Baker,B-,69,167
+035,Jonathan Scott,27,M,Appendicitis,2023-02-19,Dr. Adams,O+,73,178
+036,Lisa Young,46,F,Ovarian Cyst,2023-01-26,Dr. Nelson,A-,64,165
+037,Michael King,61,M,Cataracts,2023-03-09,Dr. Carter,B+,86,183
+038,Sarah Walker,34,F,Eczema,2023-02-07,Dr. Mitchell,AB-,60,163
+039,William Allen,57,M,Hearing Loss,2023-01-29,Dr. Perez,O+,90,185
+040,Angela Mitchell,49,F,Graves' Disease,2023-03-13,Dr. Roberts,A+,67,170
+041,Charles Roberts,64,M,Benign Prostatic Hyperplasia,2023-02-02,Dr. Turner,B-,82,178
+042,Elizabeth Phillips,31,F,Ulcerative Colitis,2023-01-21,Dr. Phillips,AB+,58,160
+043,James Campbell,54,M,Gout,2023-03-06,Dr. Campbell,O-,87,183
+044,Dorothy Parker,67,F,Alzheimer's Disease,2023-02-23,Dr. Parker,A-,62,158
+045,Joseph Morgan,39,M,Chronic Sinusitis,2023-01-24,Dr. Evans,B+,76,180
+046,Margaret Bennett,45,F,Cervical Spondylosis,2023-03-04,Dr. Morris,O+,65,168
+047,Kenneth Edwards,56,M,Peripheral Neuropathy,2023-02-11,Dr. Edwards,AB-,83,179
+048,Susan Rogers,42,F,Temporomandibular Joint Disorder,2023-01-27,Dr. Cooper,A+,61,165
+049,Ronald Collins,60,M,Chronic Obstructive Pulmonary Disease,2023-03-16,Dr. Rogers,B-,78,176
+050,Carol Peterson,48,F,Gallstones,2023-02-09,Dr. Hughes,O+,70,172
