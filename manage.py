@@ -1,3 +1,4 @@
+import os
 import uuid
 
 import boto3
@@ -6,10 +7,10 @@ from botocore.exceptions import ClientError
 
 from athena_module import *
 from s3_module import *
-from utils.helpers import load_config, save_config
+from utils.helpers import load_config, save_config, get_default_bucket
 
 # Configuration Constants
-ATHENA_DATABASE = 'medical_data'
+ATHENA_DATABASE = 'medical_db'
 ATHENA_TABLE = 'patient_data'
 
 
@@ -22,7 +23,7 @@ def generate_bucket_names():
 
 @click.group()
 def cli():
-    """Medical Image Storage CLI"""
+    """Medical Data Storage CLI"""
     pass
 
 
@@ -48,11 +49,13 @@ def setup(region):
     create_bucket(images_bucket, region)
     create_bucket(data_bucket, region)
 
+    enable_versioning(images_bucket)
     enable_versioning(data_bucket)
 
     set_lifecycle_policy(images_bucket)
     set_lifecycle_policy(data_bucket)
 
+    set_bucket_policy(images_bucket)
     set_bucket_policy(data_bucket)
 
     enable_encryption(images_bucket, region)
@@ -60,6 +63,12 @@ def setup(region):
 
     athena_output_bucket = f'athena-query-results-{uuid.uuid4()}'
     create_bucket(athena_output_bucket, region)
+
+    # Apply the same security measures to the Athena bucket
+    enable_versioning(athena_output_bucket)
+    set_lifecycle_policy(athena_output_bucket)
+    set_bucket_policy(athena_output_bucket)
+    enable_encryption(athena_output_bucket, region)
 
     config_data = {
         "images_bucket": images_bucket,
@@ -103,10 +112,15 @@ def list_contents(bucket_name):
 
 @s3.command('upload')
 @click.argument('filename')
-def upload(filename):
-    """Upload a file to the data bucket"""
+@click.option('--bucket', help='Specify a bucket to override automatic selection')
+def upload(filename, bucket):
+    """Upload a file to the appropriate bucket"""
     config_data = load_config()
-    upload_file(f'data/{filename}', config_data['data_bucket'])
+    if not bucket:
+        bucket = get_default_bucket(filename, config_data)
+
+    upload_file(filename, bucket)
+    click.echo(f"Uploaded {filename} to {bucket}")
 
 
 @s3.command('delete-file')
@@ -201,23 +215,23 @@ def set_storage_class(filename, storage_class):
 @s3.command('generate-presigned-url')
 @click.argument('filename')
 @click.option('--expiration', default=3600, help='Expiration time in seconds')
-@click.option('--bucket', help='Bucket name')
+@click.option('--bucket', help='Specify a bucket to override automatic selection')
 def generate_presigned_url(filename, expiration, bucket):
     """Generate a presigned URL for a file"""
     config_data = load_config()
     s3_client = boto3.client('s3')
 
-    # Use the provided bucket name if given, otherwise use the default from config
-    bucket_name = bucket or config_data['data_bucket']
+    if not bucket:
+        bucket = get_default_bucket(filename, config_data)
 
     try:
         url = s3_client.generate_presigned_url(
             'get_object',
-            Params={'Bucket': bucket_name, 'Key': filename},
+            Params={'Bucket': bucket, 'Key': filename},
             ExpiresIn=expiration
         )
         click.echo(
-            f"Presigned URL for {filename} in bucket {bucket_name} (expires in {expiration} seconds):\n{url}")
+            f"Presigned URL for {filename} in bucket {bucket} (expires in {expiration} seconds):\n{url}")
     except ClientError as e:
         click.echo(f"Error generating presigned URL: {str(e)}")
 
@@ -249,6 +263,21 @@ def run_query(query):
     config_data = load_config()
     run_athena_query(query, ATHENA_DATABASE, config_data['athena_output_bucket'])
     click.echo(f"Athena query executed.")
+
+
+@s3.command('download')
+@click.argument('filename')
+@click.option('--bucket', help='Specify a bucket to override automatic selection')
+@click.option('--region', default='us-east-1', help='AWS region')
+def download(filename, bucket, region):
+    """Download a file from the appropriate bucket"""
+    config_data = load_config()
+    if not bucket:
+        bucket = get_default_bucket(filename, config_data)
+
+    current_directory = os.getcwd()
+    download_file(bucket, filename, current_directory, region)
+    click.echo(f"Downloaded {filename} from {bucket}")
 
 
 if __name__ == '__main__':

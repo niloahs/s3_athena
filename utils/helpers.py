@@ -1,5 +1,6 @@
 import datetime
 import json
+import mimetypes
 import os
 
 import click
@@ -62,3 +63,16 @@ def generate_filename(query):
     filename = ''.join(c for c in filename if c.isalnum() or c in ['_', '.'])
 
     return filename
+
+
+def get_default_bucket(filename, config_data):
+    """Determine the appropriate bucket based on file type"""
+    _, file_extension = os.path.splitext(filename.lower())
+    mime_type, _ = mimetypes.guess_type(filename)
+
+    if mime_type and mime_type.startswith('image/'):
+        return config_data['images_bucket']
+    elif file_extension in ['.csv', '.txt', '.json']:
+        return config_data['data_bucket']
+    else:
+        return config_data['data_bucket']  # Default to data bucket

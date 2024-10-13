@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 
 import boto3
 from botocore.config import Config
@@ -271,4 +272,21 @@ def enable_encryption(bucket_name, region=REGION_NAME):
         print(f"Enabled server-side encryption for '{bucket_name}'.")
     except ClientError as e:
         print(f"Error enabling encryption for '{bucket_name}': {e}")
+        raise
+
+
+def download_file(bucket_name, object_name, file_path, region='us-east-1'):
+    """Downloads a file from the specified S3 bucket and saves it with a 'dl' prefix and the current date."""
+    s3_client = boto3.client('s3', region_name=region)
+    try:
+        # Extract the file name and prepend the 'downloaded_' prefix and current date
+        file_name = os.path.basename(object_name)
+        current_date = datetime.now().strftime('%Y%m%d')
+        new_file_name = f"dl_{current_date}_{file_name}"
+        new_file_path = os.path.join(file_path, new_file_name)
+
+        s3_client.download_file(bucket_name, object_name, new_file_path)
+        print(f"File '{object_name}' downloaded successfully to '{new_file_path}'.")
+    except ClientError as e:
+        print(f"Error downloading file '{object_name}': {e}")
         raise
