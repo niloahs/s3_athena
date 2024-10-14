@@ -1,3 +1,11 @@
+"""
+Author: Mark Mekhail
+Date: 10/12/24
+Description: A CLI tool for managing medical data storage using S3 and Athena.
+The tool allows users to set up S3 buckets and Athena, upload and download files,
+run Athena queries, and more.
+"""
+
 import os
 import uuid
 
@@ -14,8 +22,13 @@ ATHENA_DATABASE = 'medical_db'
 ATHENA_TABLE = 'patient_data'
 
 
-# Generate unique bucket names
 def generate_bucket_names():
+    """
+    Generate unique bucket names.
+
+    Returns:
+        tuple: A tuple containing the names of the images and data buckets.
+    """
     images_bucket = f'medical-images-{uuid.uuid4()}'
     data_bucket = f'patient-data-{uuid.uuid4()}'
     return images_bucket, data_bucket
@@ -42,7 +55,12 @@ def athena():
 @cli.command()
 @click.option('--region', default=REGION_NAME, help='AWS region')
 def setup(region):
-    """Set up S3 buckets and Athena"""
+    """
+    Set up S3 buckets and Athena.
+
+    Args:
+        region (str): The AWS region.
+    """
     click.echo("Setting up S3 buckets and Athena...")
     images_bucket, data_bucket = generate_bucket_names()
 
@@ -64,7 +82,6 @@ def setup(region):
     athena_output_bucket = f'athena-query-results-{uuid.uuid4()}'
     create_bucket(athena_output_bucket, region)
 
-    # Apply the same security measures to the Athena bucket
     enable_versioning(athena_output_bucket)
     set_lifecycle_policy(athena_output_bucket)
     set_bucket_policy(athena_output_bucket)
@@ -83,7 +100,12 @@ def setup(region):
 @s3.command('delete-bucket')
 @click.argument('bucket_names', nargs=-1, type=click.STRING, required=True)
 def delete_bucket_command(bucket_names):
-    """Delete one or more S3 buckets"""
+    """
+    Delete one or more S3 buckets.
+
+    Args:
+        bucket_names (tuple): The names of the buckets to delete.
+    """
     results = delete_multiple_buckets(bucket_names)
     for result in results:
         click.echo(result)
@@ -98,7 +120,13 @@ def delete_bucket_command(bucket_names):
 @click.option('--nodate', is_flag=True, help='List buckets without creation dates')
 @click.option('--collection', is_flag=True, help='Output bucket names as a space-separated list')
 def s3_list_buckets(nodate, collection):
-    """List all S3 buckets in the AWS account"""
+    """
+    List all S3 buckets in the AWS account.
+
+    Args:
+        nodate (bool): Flag to list buckets without creation dates.
+        collection (bool): Flag to output bucket names as a space-separated list.
+    """
     result = list_buckets(nodate, collection)
     click.echo(result)
 
@@ -106,7 +134,12 @@ def s3_list_buckets(nodate, collection):
 @s3.command('list-contents')
 @click.argument('bucket_name')
 def list_contents(bucket_name):
-    """List contents of the specified bucket"""
+    """
+    List contents of the specified bucket.
+
+    Args:
+        bucket_name (str): The name of the bucket.
+    """
     list_bucket_contents(bucket_name)
 
 
@@ -114,7 +147,13 @@ def list_contents(bucket_name):
 @click.argument('filename')
 @click.option('--bucket', help='Specify a bucket to override automatic selection')
 def upload(filename, bucket):
-    """Upload a file to the appropriate bucket"""
+    """
+    Upload a file to the appropriate bucket.
+
+    Args:
+        filename (str): The name of the file to upload.
+        bucket (str): The name of the bucket to upload to.
+    """
     config_data = load_config()
     if not bucket:
         bucket = get_default_bucket(filename, config_data)
@@ -126,7 +165,12 @@ def upload(filename, bucket):
 @s3.command('delete-file')
 @click.argument('filename')
 def delete_file(filename):
-    """Delete a file from the data bucket (creates a delete marker)"""
+    """
+    Delete a file from the data bucket (creates a delete marker).
+
+    Args:
+        filename (str): The name of the file to delete.
+    """
     config_data = load_config()
     s3_client = boto3.client('s3')
     try:
@@ -140,7 +184,13 @@ def delete_file(filename):
 @click.argument('filename')
 @click.argument('version_id')
 def restore_version(filename, version_id):
-    """Restore a specific version of a file"""
+    """
+    Restore a specific version of a file.
+
+    Args:
+        filename (str): The name of the file.
+        version_id (str): The version ID to restore.
+    """
     config_data = load_config()
     s3_client = boto3.client('s3')
     bucket_name = config_data['data_bucket']
@@ -173,7 +223,12 @@ def restore_version(filename, version_id):
 @s3.command('list-versions')
 @click.argument('filename')
 def list_versions(filename):
-    """List all versions of a specific file"""
+    """
+    List all versions of a specific file.
+
+    Args:
+        filename (str): The name of the file.
+    """
     config_data = load_config()
     s3_client = boto3.client('s3')
     bucket_name = config_data['data_bucket']
@@ -190,34 +245,19 @@ def list_versions(filename):
         click.echo(f"Error listing versions of {filename}: {e}")
 
 
-@s3.command('set-storage-class')
-@click.argument('filename')
-@click.option('--storage_class', type=click.Choice(
-    ['STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING', 'GLACIER', 'DEEP_ARCHIVE']),
-              required=True, help='Storage class to set')
-def set_storage_class(filename, storage_class):
-    """Set the storage class for a specific file"""
-    config_data = load_config()
-    s3_client = boto3.client('s3')
-    bucket_name = config_data['data_bucket']
-    try:
-        s3_client.copy_object(
-            Bucket=bucket_name,
-            CopySource={'Bucket': bucket_name, 'Key': filename},
-            Key=filename,
-            StorageClass=storage_class
-        )
-        click.echo(f"Set storage class of {filename} to {storage_class}")
-    except ClientError as e:
-        click.echo(f"Error setting storage class for {filename}: {str(e)}")
-
-
 @s3.command('generate-presigned-url')
 @click.argument('filename')
 @click.option('--expiration', default=3600, help='Expiration time in seconds')
 @click.option('--bucket', help='Specify a bucket to override automatic selection')
 def generate_presigned_url(filename, expiration, bucket):
-    """Generate a presigned URL for a file"""
+    """
+    Generate a presigned URL for a file.
+
+    Args:
+        filename (str): The name of the file.
+        expiration (int): The expiration time in seconds.
+        bucket (str): The name of the bucket.
+    """
     config_data = load_config()
     s3_client = boto3.client('s3')
 
@@ -240,7 +280,13 @@ def generate_presigned_url(filename, expiration, bucket):
 @click.argument('query')
 @click.option('--iterations', default=5, help='Number of iterations for performance testing')
 def athena_performance_test(query, iterations):
-    """Run performance tests on Athena SELECT queries"""
+    """
+    Run performance tests on Athena SELECT queries.
+
+    Args:
+        query (str): The SQL query to test.
+        iterations (int): The number of times to run the query.
+    """
     config_data = load_config()
     results = performance_test_select_query(query, ATHENA_DATABASE,
                                             config_data['athena_output_bucket'], iterations)
@@ -259,7 +305,12 @@ def athena_performance_test(query, iterations):
 @athena.command('run-query')
 @click.argument('query')
 def run_query(query):
-    """Run an Athena query"""
+    """
+    Run an Athena query.
+
+    Args:
+        query (str): The SQL query to run.
+    """
     config_data = load_config()
     run_athena_query(query, ATHENA_DATABASE, config_data['athena_output_bucket'])
     click.echo(f"Athena query executed.")
@@ -270,7 +321,14 @@ def run_query(query):
 @click.option('--bucket', help='Specify a bucket to override automatic selection')
 @click.option('--region', default='us-east-1', help='AWS region')
 def download(filename, bucket, region):
-    """Download a file from the appropriate bucket"""
+    """
+    Download a file from the appropriate bucket.
+
+    Args:
+        filename (str): The name of the file to download.
+        bucket (str): The name of the bucket to download from.
+        region (str): The AWS region.
+    """
     config_data = load_config()
     if not bucket:
         bucket = get_default_bucket(filename, config_data)

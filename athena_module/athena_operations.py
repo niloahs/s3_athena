@@ -1,3 +1,10 @@
+"""
+Author: Mark Mekhail
+Date: 10/12/24
+Description: This module provides functions to interact with AWS Athena and S3.
+It includes functionalities to run Athena queries, manage query results, and perform performance tests.
+"""
+
 import time
 
 import boto3
@@ -17,7 +24,18 @@ def get_s3_client(region='us-east-1'):
 
 
 def run_athena_query(query, database_name, athena_output_bucket, region='us-east-1'):
-    """Executes a given SQL query in Athena and stores the results if applicable."""
+    """
+    Executes a given SQL query in Athena and stores the results if applicable.
+
+    Args:
+        query (str): The SQL query to execute.
+        database_name (str): The name of the Athena database.
+        athena_output_bucket (str): The S3 bucket to store query results.
+        region (str): The AWS region. Defaults to 'us-east-1'.
+
+    Raises:
+        ClientError: If there's an issue executing the query.
+    """
     athena_client = get_athena_client(region)
     try:
         response = athena_client.start_query_execution(
@@ -28,6 +46,7 @@ def run_athena_query(query, database_name, athena_output_bucket, region='us-east
         query_execution_id = response['QueryExecutionId']
         print(f"Executing Athena query: {query_execution_id}")
 
+        # Wait for the query to complete
         wait_for_query_to_complete(query_execution_id, athena_client)
 
         # Check if the query is a SELECT statement
@@ -49,7 +68,17 @@ def run_athena_query(query, database_name, athena_output_bucket, region='us-east
 
 
 def wait_for_query_to_complete(query_execution_id, athena_client, sleep_time=2):
-    """Waits for the Athena query to complete."""
+    """
+    Waits for the Athena query to complete.
+
+    Args:
+        query_execution_id (str): The ID of the query execution.
+        athena_client (boto3.client): The Athena client.
+        sleep_time (int): Time to wait between status checks. Defaults to 2 seconds.
+
+    Raises:
+        ClientError: If there's an issue checking the query status.
+    """
     while True:
         try:
             status = athena_client.get_query_execution(QueryExecutionId=query_execution_id)
@@ -67,7 +96,19 @@ def wait_for_query_to_complete(query_execution_id, athena_client, sleep_time=2):
 
 
 def get_query_results(query_execution_id, athena_client):
-    """Retrieves and returns the results of a completed Athena query."""
+    """
+    Retrieves and returns the results of a completed Athena query.
+
+    Args:
+        query_execution_id (str): The ID of the query execution.
+        athena_client (boto3.client): The Athena client.
+
+    Returns:
+        list: The query results.
+
+    Raises:
+        ClientError: If there's an issue retrieving the query results.
+    """
     try:
         paginator = athena_client.get_paginator('get_query_results')
         pages = paginator.paginate(QueryExecutionId=query_execution_id)
@@ -75,6 +116,7 @@ def get_query_results(query_execution_id, athena_client):
         print("Athena Query Results:")
         for page in pages:
             for row in page['ResultSet']['Rows']:
+                # Extract the data from each row
                 row_data = [col.get('VarCharValue', '') for col in row['Data']]
                 results.append(row_data)
                 print(row_data)
@@ -85,7 +127,17 @@ def get_query_results(query_execution_id, athena_client):
 
 
 def store_query_results(query_execution_id, athena_output_bucket, clean_name):
-    """Store the Athena query results with a cleaner name."""
+    """
+    Store the Athena query results with a cleaner name.
+
+    Args:
+        query_execution_id (str): The ID of the query execution.
+        athena_output_bucket (str): The S3 bucket to store query results.
+        clean_name (str): The clean name for the stored results.
+
+    Raises:
+        ClientError: If there's an issue storing the query results.
+    """
     s3_client = get_s3_client()
     copy_source = f"{athena_output_bucket}/{query_execution_id}.csv"
 
@@ -102,7 +154,18 @@ def store_query_results(query_execution_id, athena_output_bucket, clean_name):
 
 
 def create_athena_database_and_table(database_name, table_name, data_bucket, region='us-east-1'):
-    """Creates a new database and table in Athena, dropping the table if it already exists."""
+    """
+    Creates a new database and table in Athena, dropping the table if it already exists.
+
+    Args:
+        database_name (str): The name of the Athena database.
+        table_name (str): The name of the table to create.
+        data_bucket (str): The S3 bucket where the table data is stored.
+        region (str): The AWS region. Defaults to 'us-east-1'.
+
+    Raises:
+        ClientError: If there's an issue creating the database or table.
+    """
     config = load_config()
 
     # Create database query
@@ -141,7 +204,21 @@ def create_athena_database_and_table(database_name, table_name, data_bucket, reg
 
 
 def performance_test_select_query(query, database, output_bucket, iterations=5):
-    """Run performance tests on Athena SELECT queries"""
+    """
+    Run performance tests on Athena SELECT queries.
+
+    Args:
+        query (str): The SQL query to test.
+        database (str): The Athena database.
+        output_bucket (str): The S3 bucket to store query results.
+        iterations (int): The number of times to run the query. Defaults to 5.
+
+    Returns:
+        dict: The average execution time and scanned bytes.
+
+    Raises:
+        ClientError: If there's an issue executing the query.
+    """
     athena_client = boto3.client('athena')
 
     total_execution_time = 0

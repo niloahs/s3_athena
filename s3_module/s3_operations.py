@@ -1,3 +1,11 @@
+"""
+Author: Mark Mekhail
+Date: 10/13/24
+Description: This module provides functions to interact with AWS S3.
+It includes functionalities to create, delete, and manage S3 buckets and objects,
+with a focus on healthcare data management and compliance with PHIPA regulations.
+"""
+
 import json
 import os
 from datetime import datetime
@@ -12,7 +20,15 @@ REGION_NAME = 'us-east-1'
 
 
 def get_s3_clients(region=REGION_NAME):
-    """Initialize and return S3 client and resource."""
+    """
+    Initialize and return S3 client and resource.
+
+    Args:
+        region (str): The AWS region to connect to. Defaults to 'us-east-1'.
+
+    Returns:
+        tuple: A tuple containing the S3 client and S3 resource objects.
+    """
     config = Config(
         region_name=region,
         signature_version='s3v4',
@@ -27,7 +43,16 @@ def get_s3_clients(region=REGION_NAME):
 
 
 def create_bucket(bucket_name, region=REGION_NAME):
-    """Creates a new S3 bucket if it doesn't already exist."""
+    """
+    Creates a new S3 bucket if it doesn't already exist.
+
+    Args:
+        bucket_name (str): The name of the bucket to create.
+        region (str): The AWS region for the bucket. Defaults to 'us-east-1'.
+
+    Raises:
+        ClientError: If there's an issue with bucket creation or checking.
+    """
     s3_client, _ = get_s3_clients(region)
     try:
         s3_client.head_bucket(Bucket=bucket_name)
@@ -49,14 +74,20 @@ def create_bucket(bucket_name, region=REGION_NAME):
 
 
 def delete_bucket(bucket_name, region=None):
-    """Delete a single S3 bucket"""
+    """
+    Delete a single S3 bucket.
+
+    Args:
+        bucket_name (str): The name of the bucket to delete.
+        region (str, optional): The AWS region of the bucket.
+
+    Returns:
+        str: A message indicating the result of the deletion attempt.
+    """
     s3_client = boto3.client('s3', region_name=region)
     try:
-        # First, delete all objects and object versions in the bucket
         bucket = boto3.resource('s3', region_name=region).Bucket(bucket_name)
         bucket.object_versions.delete()
-
-        # Afterwards, delete the bucket
         s3_client.delete_bucket(Bucket=bucket_name)
         return f"Bucket '{bucket_name}' has been deleted."
     except ClientError as e:
@@ -64,7 +95,16 @@ def delete_bucket(bucket_name, region=None):
 
 
 def delete_multiple_buckets(bucket_names, region=None):
-    """Delete multiple S3 buckets"""
+    """
+    Delete multiple S3 buckets.
+
+    Args:
+        bucket_names (list): A list of bucket names to delete.
+        region (str, optional): The AWS region of the buckets.
+
+    Returns:
+        list: A list of messages indicating the result of each deletion attempt.
+    """
     results = []
     for bucket_name in bucket_names:
         result = delete_bucket(bucket_name, region)
@@ -73,7 +113,15 @@ def delete_multiple_buckets(bucket_names, region=None):
 
 
 def update_config_after_deletion(bucket_name):
-    """Update the config file after deleting a bucket if it was one of the main buckets."""
+    """
+    Update the config file after deleting a bucket if it was one of the main buckets.
+
+    Args:
+        bucket_name (str): The name of the deleted bucket.
+
+    Returns:
+        str or None: A message if the config was updated, None otherwise.
+    """
     config_data = load_config()
     if bucket_name in config_data.values():
         for key, value in config_data.items():
@@ -85,7 +133,17 @@ def update_config_after_deletion(bucket_name):
 
 
 def upload_file(file_path, bucket_name, object_name=None):
-    """Uploads a file to the specified S3 bucket."""
+    """
+    Uploads a file to the specified S3 bucket.
+
+    Args:
+        file_path (str): The local path to the file to be uploaded.
+        bucket_name (str): The name of the destination S3 bucket.
+        object_name (str, optional): The S3 object name. If not specified, the file name is used.
+
+    Raises:
+        ClientError: If there's an issue with the file upload.
+    """
     s3_client, _ = get_s3_clients()
     file_name = os.path.basename(file_path)
     if object_name is None:
@@ -97,6 +155,7 @@ def upload_file(file_path, bucket_name, object_name=None):
             content_type = 'text/csv'
         else:
             content_type = 'binary/octet-stream'
+
         s3_client.upload_file(
             Filename=file_path,
             Bucket=bucket_name,
@@ -110,7 +169,16 @@ def upload_file(file_path, bucket_name, object_name=None):
 
 
 def enable_versioning(bucket_name, region=REGION_NAME):
-    """Enables versioning on the specified S3 bucket."""
+    """
+    Enables versioning on the specified S3 bucket.
+
+    Args:
+        bucket_name (str): The name of the bucket to enable versioning on.
+        region (str): The AWS region of the bucket. Defaults to 'us-east-1'.
+
+    Raises:
+        ClientError: If there's an issue enabling versioning.
+    """
     s3_resource = boto3.resource('s3', region_name=region)
     try:
         bucket_versioning = s3_resource.BucketVersioning(bucket_name)
@@ -122,28 +190,49 @@ def enable_versioning(bucket_name, region=REGION_NAME):
 
 
 def set_lifecycle_policy(bucket_name, region=REGION_NAME):
-    """Sets a lifecycle policy with multiple transitions."""
+    """
+    Sets a lifecycle policy with time-based transitions aligning with PHIPA compliance.
+
+    Args:
+        bucket_name (str): The name of the bucket to set the lifecycle policy on.
+        region (str): The AWS region of the bucket. Defaults to 'us-east-1'.
+
+    Raises:
+        ClientError: If there's an issue setting the lifecycle policy.
+    """
     s3_client, _ = get_s3_clients(region)
     lifecycle_configuration = {
         'Rules': [
             {
-                'ID': 'Move to Intelligent-Tiering after 30 days',
+                'ID': 'Healthcare data lifecycle policy',
                 'Status': 'Enabled',
                 'Filter': {'Prefix': ''},
                 'Transitions': [
                     {
                         'Days': 30,
-                        'StorageClass': 'INTELLIGENT_TIERING'
-                    },
-                    {
-                        'Days': 90,
-                        'StorageClass': 'GLACIER'
+                        'StorageClass': 'STANDARD_IA'
                     },
                     {
                         'Days': 180,
+                        'StorageClass': 'GLACIER'
+                    },
+                    {
+                        'Days': 3650,
                         'StorageClass': 'DEEP_ARCHIVE'
                     }
                 ],
+                'NoncurrentVersionTransitions': [
+                    {
+                        'NoncurrentDays': 30,
+                        'StorageClass': 'STANDARD_IA'
+                    }
+                ],
+                'NoncurrentVersionExpiration': {
+                    'NoncurrentDays': 3650
+                },
+                'AbortIncompleteMultipartUpload': {
+                    'DaysAfterInitiation': 7
+                }
             }
         ]
     }
@@ -152,14 +241,23 @@ def set_lifecycle_policy(bucket_name, region=REGION_NAME):
             Bucket=bucket_name,
             LifecycleConfiguration=lifecycle_configuration
         )
-        print(f"Enhanced lifecycle policy set on bucket '{bucket_name}'.")
+        print(f"Lifecycle policy set on bucket '{bucket_name}'.")
     except ClientError as e:
         print(f"Error setting lifecycle policy on bucket '{bucket_name}': {e}")
         raise
 
 
 def set_bucket_policy(data_bucket, region=REGION_NAME):
-    """Sets bucket policy to allow Athena access to the data bucket."""
+    """
+    Sets bucket policy to allow Athena access to the data bucket.
+
+    Args:
+        data_bucket (str): The name of the data bucket to set the policy on.
+        region (str): The AWS region of the bucket. Defaults to 'us-east-1'.
+
+    Raises:
+        ClientError: If there's an issue setting the bucket policy.
+    """
     s3_client, _ = get_s3_clients(region)
     policy = {
         "Version": "2012-10-17",
@@ -194,7 +292,16 @@ def set_bucket_policy(data_bucket, region=REGION_NAME):
 
 
 def list_bucket_contents(bucket_name, region=REGION_NAME):
-    """Lists all objects in the specified S3 bucket."""
+    """
+    Lists all objects in the specified S3 bucket.
+
+    Args:
+        bucket_name (str): The name of the bucket to list contents from.
+        region (str): The AWS region of the bucket. Defaults to 'us-east-1'.
+
+    Raises:
+        ClientError: If there's an issue listing the bucket contents.
+    """
     s3_client, _ = get_s3_clients(region)
     try:
         response = s3_client.list_objects_v2(Bucket=bucket_name)
@@ -210,7 +317,16 @@ def list_bucket_contents(bucket_name, region=REGION_NAME):
 
 
 def list_buckets(nodate=False, collection=False):
-    """List all S3 buckets in the AWS account"""
+    """
+    List all S3 buckets in the AWS account.
+
+    Args:
+        nodate (bool): If True, omit creation dates from the output.
+        collection (bool): If True, return bucket names as a space-separated string.
+
+    Returns:
+        str: A formatted string containing the list of buckets or an error message.
+    """
     s3_client = boto3.client('s3')
     try:
         response = s3_client.list_buckets()
@@ -233,32 +349,17 @@ def list_buckets(nodate=False, collection=False):
         return f"Error listing buckets: {str(e)}"
 
 
-def read_csv_contents(bucket_name, file_name, region=REGION_NAME):
-    """Reads and prints the contents of a CSV file in S3."""
-    s3_client, _ = get_s3_clients(region)
-    try:
-        response = s3_client.get_object(Bucket=bucket_name, Key=file_name)
-        content = response['Body'].read().decode('utf-8')
-        print(f"Contents of '{file_name}':\n{content}")
-    except ClientError as e:
-        print(f"Error reading file '{file_name}' from bucket '{bucket_name}': {e}")
-        raise
-
-
-def check_object_storage_class(bucket_name, file_name, region=REGION_NAME):
-    """Checks and prints the storage class of a specific object."""
-    s3_client, _ = get_s3_clients(region)
-    try:
-        response = s3_client.head_object(Bucket=bucket_name, Key=file_name)
-        storage_class = response.get('StorageClass', 'STANDARD')
-        print(f"Storage Class of '{file_name}': {storage_class}")
-    except ClientError as e:
-        print(f"Error checking storage class of '{file_name}': {e}")
-        raise
-
-
 def enable_encryption(bucket_name, region=REGION_NAME):
-    """Enable server-side encryption for the bucket during setup."""
+    """
+    Enable server-side encryption for the bucket during setup.
+
+    Args:
+        bucket_name (str): The name of the bucket to enable encryption on.
+        region (str): The AWS region of the bucket. Defaults to 'us-east-1'.
+
+    Raises:
+        ClientError: If there's an issue enabling encryption on the bucket.
+    """
     s3_client, _ = get_s3_clients(region)
     try:
         s3_client.put_bucket_encryption(
@@ -276,10 +377,20 @@ def enable_encryption(bucket_name, region=REGION_NAME):
 
 
 def download_file(bucket_name, object_name, file_path, region='us-east-1'):
-    """Downloads a file from the specified S3 bucket and saves it with a 'dl' prefix and the current date."""
+    """
+    Downloads a file from the specified S3 bucket and saves it with a 'dl' prefix and the current date.
+
+    Args:
+        bucket_name (str): The name of the S3 bucket to download from.
+        object_name (str): The name of the object in the S3 bucket to download.
+        file_path (str): The local directory path to save the downloaded file.
+        region (str): The AWS region of the bucket. Defaults to 'us-east-1'.
+
+    Raises:
+        ClientError: If there's an issue downloading the file from S3.
+    """
     s3_client = boto3.client('s3', region_name=region)
     try:
-        # Extract the file name and prepend the 'downloaded_' prefix and current date
         file_name = os.path.basename(object_name)
         current_date = datetime.now().strftime('%Y%m%d')
         new_file_name = f"dl_{current_date}_{file_name}"
