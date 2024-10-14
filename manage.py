@@ -52,9 +52,9 @@ def athena():
     pass
 
 
-@cli.command()
+@s3.command('setup')
 @click.option('--region', default=REGION_NAME, help='AWS region')
-def setup(region):
+def s3_setup(region):
     """
     Set up S3 buckets and Athena.
 
@@ -65,26 +65,26 @@ def setup(region):
     images_bucket, data_bucket = generate_bucket_names()
 
     create_bucket(images_bucket, region)
+    enable_versioning(images_bucket, region)
+
     create_bucket(data_bucket, region)
+    enable_versioning(data_bucket, region)
 
-    enable_versioning(images_bucket)
-    enable_versioning(data_bucket)
+    set_lifecycle_policy(images_bucket, region)
+    set_lifecycle_policy(data_bucket, region)
 
-    set_lifecycle_policy(images_bucket)
-    set_lifecycle_policy(data_bucket)
-
-    set_bucket_policy(images_bucket)
-    set_bucket_policy(data_bucket)
+    set_bucket_policy(images_bucket, region)
+    set_bucket_policy(data_bucket, region)
 
     enable_encryption(images_bucket, region)
     enable_encryption(data_bucket, region)
 
     athena_output_bucket = f'athena-query-results-{uuid.uuid4()}'
     create_bucket(athena_output_bucket, region)
+    enable_versioning(athena_output_bucket, region)
 
-    enable_versioning(athena_output_bucket)
-    set_lifecycle_policy(athena_output_bucket)
-    set_bucket_policy(athena_output_bucket)
+    set_lifecycle_policy(athena_output_bucket, region)
+    set_bucket_policy(athena_output_bucket, region)
     enable_encryption(athena_output_bucket, region)
 
     config_data = {
