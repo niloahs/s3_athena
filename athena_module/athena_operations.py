@@ -214,7 +214,7 @@ def performance_test_select_query(query, database, output_bucket, iterations=5):
         iterations (int): The number of times to run the query. Defaults to 5.
 
     Returns:
-        dict: The average execution time and scanned bytes.
+        dict: The average execution time and average scanned bytes.
 
     Raises:
         ClientError: If there's an issue executing the query.
@@ -224,7 +224,7 @@ def performance_test_select_query(query, database, output_bucket, iterations=5):
     total_execution_time = 0
     total_scanned_bytes = 0
 
-    for i in range(iterations):
+    for _ in range(iterations):
         start_time = time.time()
 
         response = athena_client.start_query_execution(

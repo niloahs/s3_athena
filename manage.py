@@ -295,12 +295,6 @@ def athena_performance_test(query, iterations):
     click.echo(f"Average execution time: {results['average_execution_time']:.2f} seconds")
     click.echo(f"Average data scanned: {results['average_scanned_bytes'] / 1024:.2f} KB")
 
-    click.echo("\nIteration details:")
-    for i, result in enumerate(results['iteration_results'], 1):
-        click.echo(f"  Iteration {i}:")
-        click.echo(f"    Execution time: {result['execution_time']:.2f} seconds")
-        click.echo(f"    Data scanned: {result['scanned_bytes'] / 1024:.2f} KB")
-
 
 @athena.command('run-query')
 @click.argument('query')
@@ -336,6 +330,23 @@ def download(filename, bucket, region):
     current_directory = os.getcwd()
     download_file(bucket, filename, current_directory, region)
     click.echo(f"Downloaded {filename} from {bucket}")
+
+
+@athena.command('setup')
+@click.option('--region', default='us-east-1', help='AWS region')
+def setup_athena(region):
+    """
+    Set up Athena database and table.
+
+    Args:
+        region (str): The AWS region.
+    """
+    config_data = load_config()
+    data_bucket = config_data['data_bucket']
+
+    click.echo("Setting up Athena database and table...")
+    create_athena_database_and_table(ATHENA_DATABASE, ATHENA_TABLE, data_bucket, region)
+    click.echo(f"Athena database '{ATHENA_DATABASE}' and table '{ATHENA_TABLE}' have been set up.")
 
 
 if __name__ == '__main__':

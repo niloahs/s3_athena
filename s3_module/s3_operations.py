@@ -191,7 +191,7 @@ def enable_versioning(bucket_name, region=REGION_NAME):
 
 def set_lifecycle_policy(bucket_name, region=REGION_NAME):
     """
-    Sets a lifecycle policy with time-based transitions aligning with PHIPA compliance.
+    Sets a comprehensive lifecycle policy for healthcare data.
 
     Args:
         bucket_name (str): The name of the bucket to set the lifecycle policy on.
@@ -209,26 +209,30 @@ def set_lifecycle_policy(bucket_name, region=REGION_NAME):
                 'Filter': {'Prefix': ''},
                 'Transitions': [
                     {
-                        'Days': 30,
-                        'StorageClass': 'STANDARD_IA'
+                        'Days': 60,
+                        'StorageClass': 'INTELLIGENT_TIERING'
                     },
                     {
-                        'Days': 180,
+                        'Days': 365,
                         'StorageClass': 'GLACIER'
                     },
                     {
-                        'Days': 3650,
+                        'Days': 2555,  # ~7 years
                         'StorageClass': 'DEEP_ARCHIVE'
                     }
                 ],
                 'NoncurrentVersionTransitions': [
                     {
-                        'NoncurrentDays': 30,
-                        'StorageClass': 'STANDARD_IA'
+                        'NoncurrentDays': 60,
+                        'StorageClass': 'INTELLIGENT_TIERING'
+                    },
+                    {
+                        'NoncurrentDays': 365,
+                        'StorageClass': 'GLACIER'
                     }
                 ],
                 'NoncurrentVersionExpiration': {
-                    'NoncurrentDays': 3650
+                    'NoncurrentDays': 2555  # ~7 years
                 },
                 'AbortIncompleteMultipartUpload': {
                     'DaysAfterInitiation': 7
@@ -241,7 +245,7 @@ def set_lifecycle_policy(bucket_name, region=REGION_NAME):
             Bucket=bucket_name,
             LifecycleConfiguration=lifecycle_configuration
         )
-        print(f"Lifecycle policy set on bucket '{bucket_name}'.")
+        print(f"Comprehensive lifecycle policy set on bucket '{bucket_name}'.")
     except ClientError as e:
         print(f"Error setting lifecycle policy on bucket '{bucket_name}': {e}")
         raise
