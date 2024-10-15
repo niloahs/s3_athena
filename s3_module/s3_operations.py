@@ -8,7 +8,6 @@ with a focus on healthcare data management and compliance with PHIPA regulations
 
 import json
 import os
-from datetime import datetime
 
 import boto3
 from botocore.config import Config
@@ -251,47 +250,27 @@ def set_lifecycle_policy(bucket_name, region=REGION_NAME):
         raise
 
 
-def set_bucket_policy(data_bucket, region=REGION_NAME):
+def set_bucket_policy(bucket_name, policy, region='us-east-1'):
     """
-    Sets bucket policy to allow Athena access to the data bucket.
+    Sets a bucket policy.
 
     Args:
-        data_bucket (str): The name of the data bucket to set the policy on.
+        bucket_name (str): The name of the bucket to set the policy on.
+        policy (dict): The policy to apply.
         region (str): The AWS region of the bucket. Defaults to 'us-east-1'.
 
     Raises:
         ClientError: If there's an issue setting the bucket policy.
     """
-    s3_client, _ = get_s3_clients(region)
-    policy = {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Sid": "AllowAthenaAccessToDataBucket",
-                "Effect": "Allow",
-                "Principal": {
-                    "Service": "athena.amazonaws.com"
-                },
-                "Action": [
-                    "s3:GetBucketLocation",
-                    "s3:GetObject",
-                    "s3:ListBucket"
-                ],
-                "Resource": [
-                    f"arn:aws:s3:::{data_bucket}",
-                    f"arn:aws:s3:::{data_bucket}/*"
-                ]
-            }
-        ]
-    }
+    s3_client = boto3.client('s3', region_name=region)
     try:
         s3_client.put_bucket_policy(
-            Bucket=data_bucket,
+            Bucket=bucket_name,
             Policy=json.dumps(policy)
         )
-        print(f"Bucket policy set on '{data_bucket}' to allow Athena access.")
+        print(f"Bucket policy set on '{bucket_name}'.")
     except ClientError as e:
-        print(f"Error setting bucket policy on '{data_bucket}': {e}")
+        print(f"Error setting bucket policy on '{bucket_name}': {e}")
         raise
 
 
@@ -396,8 +375,7 @@ def download_file(bucket_name, object_name, file_path, region='us-east-1'):
     s3_client = boto3.client('s3', region_name=region)
     try:
         file_name = os.path.basename(object_name)
-        current_date = datetime.now().strftime('%Y%m%d')
-        new_file_name = f"dl_{current_date}_{file_name}"
+        new_file_name = f"dl_{file_name}"
         new_file_path = os.path.join(file_path, new_file_name)
 
         s3_client.download_file(bucket_name, object_name, new_file_path)

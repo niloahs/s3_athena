@@ -56,7 +56,8 @@ def run_athena_query(query, database_name, athena_output_bucket, region='us-east
             if query_results:  # Only store results if the query returns data
                 file_name = generate_filename(query)
                 store_query_results(query_execution_id, athena_output_bucket, file_name)
-                print(f"Results stored with filename: {file_name}.csv")
+                print(
+                    f"Results stored with filename: '{file_name}.csv' in bucket: '{athena_output_bucket}'")
             else:
                 print("No data returned. Query results not stored.")
         else:

@@ -1,5 +1,5 @@
 {
-    "images_bucket": "medical-images-e2e7bb13-1ac3-4bdd-8df2-f13756452df1",
-    "data_bucket": "patient-data-473aae0c-70e5-4d92-8cfe-df6bbe6e3f54",
-    "athena_output_bucket": "athena-query-results-33cec251-ddf9-4f6a-a955-1da4d3f76cd6"
+    "images_bucket": "medical-images-cc09d1d6-170a-4398-af1e-a9efbfb1c522",
+    "data_bucket": "patient-data-e68b18f7-cf64-4852-920a-01dd4d108f84",
+    "athena_output_bucket": "athena-query-results-a0764653-eda5-4251-802e-41c4d0ca0063"
 }

@@ -56,10 +56,7 @@ def athena():
 @click.option('--region', default=REGION_NAME, help='AWS region')
 def s3_setup(region):
     """
-    Set up S3 buckets and Athena.
-
-    Args:
-        region (str): The AWS region.
+    Set up S3 buckets and Athena with granular policies.
     """
     click.echo("Setting up S3 buckets and Athena...")
     images_bucket, data_bucket = generate_bucket_names()
@@ -73,8 +70,54 @@ def s3_setup(region):
     set_lifecycle_policy(images_bucket, region)
     set_lifecycle_policy(data_bucket, region)
 
-    set_bucket_policy(images_bucket, region)
-    set_bucket_policy(data_bucket, region)
+    # Get the account ID
+    sts_client = boto3.client('sts')
+    account_id = sts_client.get_caller_identity()["Account"]
+
+    images_bucket_policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "AllowImageUploadDownload",
+                "Effect": "Allow",
+                "Principal": {
+                    "AWS": f"arn:aws:iam::{account_id}:root"
+                },
+                "Action": [
+                    "s3:PutObject",
+                    "s3:GetObject"
+                ],
+                "Resource": [
+                    f"arn:aws:s3:::{images_bucket}/*"
+                ]
+            }
+        ]
+    }
+
+    data_bucket_policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "AllowAthenaAccessToDataBucket",
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "athena.amazonaws.com"
+                },
+                "Action": [
+                    "s3:GetBucketLocation",
+                    "s3:GetObject",
+                    "s3:ListBucket"
+                ],
+                "Resource": [
+                    f"arn:aws:s3:::{data_bucket}",
+                    f"arn:aws:s3:::{data_bucket}/*"
+                ]
+            }
+        ]
+    }
+
+    set_bucket_policy(images_bucket, images_bucket_policy, region)
+    set_bucket_policy(data_bucket, data_bucket_policy, region)
 
     enable_encryption(images_bucket, region)
     enable_encryption(data_bucket, region)
@@ -83,8 +126,28 @@ def s3_setup(region):
     create_bucket(athena_output_bucket, region)
     enable_versioning(athena_output_bucket, region)
 
+    athena_output_bucket_policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "AllowAthenaWriteResults",
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "athena.amazonaws.com"
+                },
+                "Action": [
+                    "s3:PutObject",
+                    "s3:GetObject"
+                ],
+                "Resource": [
+                    f"arn:aws:s3:::{athena_output_bucket}/*"
+                ]
+            }
+        ]
+    }
+
     set_lifecycle_policy(athena_output_bucket, region)
-    set_bucket_policy(athena_output_bucket, region)
+    set_bucket_policy(athena_output_bucket, athena_output_bucket_policy, region)
     enable_encryption(athena_output_bucket, region)
 
     config_data = {
